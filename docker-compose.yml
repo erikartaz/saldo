@@ -7,11 +7,11 @@ services:
     restart: unless-stopped
     init: true
     ports:
-      # Caddy è esterno a questo stack (LXC/container separato): deve poter
-      # raggiungere la porta 8000 dell'host Docker. Limita la porta con il
-      # firewall all'IP di Caddy. Se Caddy è sullo stesso host, imposta
-      # SALDO_BIND_IP=127.0.0.1.
-      - "${SALDO_BIND_IP:-0.0.0.0}:${SALDO_PORT:-8000}:8000"
+      # La 8000 è già occupata sulla VM Portainer: usiamo 8090 sull'host.
+      # Il container continua ad ascoltare internamente sulla 8000.
+      # Caddy (LXC/container separato) raggiunge 192.168.1.11:8090.
+      # Limita la porta con il firewall all'IP di Caddy.
+      - "${SALDO_BIND_IP:-0.0.0.0}:${SALDO_PORT:-8090}:8000"
     environment:
       SALDO_DATABASE_URL: "sqlite:////app/backend/data/saldo.db"
       # Se vuoto, Saldo genera un segreto persistente in /app/backend/data/.secret.

@@ -9,13 +9,13 @@ Questa guida usa lo stack Git di Portainer: Portainer clona il repository, costr
 - **Volume nominato** `saldo_data` montato su `/app/backend/data`: contiene `saldo.db` e l'eventuale `.secret`.
 - **Healthcheck** su `/api/health`.
 - **Riavvio automatico** con `restart: unless-stopped`.
-- **Porta** `8000` pubblicata sull'host, raggiungibile dal Caddy esterno (LXC o container separato).
+- **Porta host** `8090` (la `8000` sulla VM è già occupata), mappata sulla porta `8000` interna del container. Caddy esterno la raggiunge su `192.168.1.11:8090`.
 
 ## Prerequisiti
 
 - Portainer con un ambiente Docker funzionante.
 - Repository GitHub accessibile da Portainer (pubblico oppure con credenziali Git configurate).
-- Porta host libera (default `8000`).
+- Porta host `8090` libera sulla VM Portainer (`192.168.1.11`).
 - Facoltativo: Caddy o un altro reverse proxy per HTTPS.
 
 ## 1. Crea lo stack da Git
@@ -38,7 +38,7 @@ Portainer costruirà l'immagine e avvierà il container. Il primo build può ric
 | --- | --- | --- |
 | `SALDO_JWT_SECRET` | vuota | Consigliata in produzione. Se vuota, viene generato un segreto persistente nel volume. |
 | `SALDO_ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` | Durata sessione: 7 giorni. |
-| `SALDO_PORT` | `8000` | Porta pubblicata sull'host. |
+| `SALDO_PORT` | `8090` | Porta pubblicata sull'host (mappata alla 8000 interna). |
 | `SALDO_BIND_IP` | `0.0.0.0` | Interfaccia di ascolto. Se Caddy è sullo stesso host puoi usare `127.0.0.1`. |
 | `TZ` | `Europe/Rome` | Fuso orario usato da date, mesi e ricorrenze. |
 
@@ -55,7 +55,7 @@ Incollalo in Portainer come valore di `SALDO_JWT_SECRET`. Non inserirlo nel repo
 Apri:
 
 ```text
-http://IP-DEL-SERVER:8000
+http://192.168.1.11:8090
 ```
 
 Se hai bindato su `127.0.0.1`, l'app non è raggiungibile direttamente dalla rete: usa Caddy o un tunnel SSH.
@@ -64,26 +64,27 @@ Al primo accesso crea l'account. Poi aggiungi conti e movimenti.
 
 ## 4. Caddy esterno
 
-Caddy è già presente nel tuo homelab e non fa parte di questo stack. Saldo pubblica la porta `8000` sull'host Docker: Caddy deve raggiungerla e fare da reverse proxy.
+Caddy è già presente nel tuo homelab e non fa parte di questo stack. Saldo pubblica la porta `8090` sull'host Docker `192.168.1.11`: Caddy deve raggiungerla e fare da reverse proxy.
 
-Se Caddy è un LXC/container separato:
+Aggiungi al Caddyfile:
 
 ```caddyfile
-saldo.example.com {
-    reverse_proxy http://IP-DELL-HOST-DOCKER:8000
+https://saldo.erikartaz.work {
+    reverse_proxy 192.168.1.11:8090
 }
 ```
+Il container ascolta internamente sulla `8000`; la `8090` è solo la porta pubblicata sull'host. Non serve cambiare la porta interna.
 
-Nell'esempio [Caddyfile.example](Caddyfile.example) sostituisci `127.0.0.1` con l'IP LAN dell'host Docker. Il Caddyfile vero e proprio resta nel tuo container Caddy.
+Nell'esempio [Caddyfile.example](Caddyfile.example) il dominio e l'IP sono già impostati su `saldo.erikartaz.work` e `192.168.1.11:8090`. Il Caddyfile vero e proprio resta nel tuo container Caddy.
 
 Suggerimenti:
 
-- limita la porta `8000` con il firewall all'IP di Caddy;
-- non pubblicare la porta `8000` su Internet;
+- limita la porta `8090` con il firewall all'IP di Caddy;
+- non pubblicare la porta `8090` su Internet;
 - HTTPS, certificati e redirect restano gestiti da Caddy;
-- se in futuro Caddy girerà sullo stesso host Docker, puoi impostare `SALDO_BIND_IP=127.0.0.1` e usare `reverse_proxy 127.0.0.1:8000`.
+- se in futuro Caddy girerà sullo stesso host Docker, puoi impostare `SALDO_BIND_IP=127.0.0.1` e usare `reverse_proxy 127.0.0.1:8090`.
 
-Evita di pubblicare la porta 8000 su Internet senza proxy: SQLite e il login non sono pensati per l'esposizione diretta.
+Evita di pubblicare la porta 8090 su Internet senza proxy: SQLite e il login non sono pensati per l'esposizione diretta.
 
 ## 5. Aggiornamenti
 
@@ -130,7 +131,7 @@ Su Portainer puoi anche usare il browser dei volumi. Conserva anche il segreto J
 ## 8. Verifica rapida
 
 ```bash
-curl http://127.0.0.1:8000/api/health
+curl http://127.0.0.1:8090/api/health
 # {"status":"ok","app":"Saldo","version":"1.0.0"}
 ```
 

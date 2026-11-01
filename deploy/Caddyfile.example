@@ -1,18 +1,18 @@
 # Esempio di Caddyfile per Saldo.
 #
-# Se Caddy gira in un LXC/container separato dall'host Docker, sostituisci
-# 127.0.0.1 con l'IP LAN dell'host Docker (es. 192.168.1.50:8000).
-# Se Caddy e Saldo condividono lo stesso host, 127.0.0.1:8000 va bene.
+# Configurazione pensata per il homelab:
+#   Caddy -> 192.168.1.11:8090 (VM Portainer)
 #
-# 1. Sostituisci saldo.example.com con il tuo dominio.
-# 2. Il DNS del dominio deve puntare all'IP pubblico del server.
-# 3. Le porte 80 e 443 devono essere raggiungibili da Internet.
-# 4. Avvia Caddy con:
-#      caddy run --config C:\caddy\Caddyfile --adapter caddyfile
+# La porta 8090 è la porta host mappata alla 8000 interna del container.
+# Se cambi SALDO_PORT nello stack Portainer, aggiorna anche questo valore.
+#
+# 1. Crea il DNS per saldo.erikartaz.work verso il server Caddy.
+# 2. Le porte 80 e 443 devono essere raggiungibili da Internet.
+# 3. Inserisci questo blocco nel Caddyfile del tuo container Caddy.
 #
 # Caddy ottiene e rinnova automaticamente il certificato HTTPS.
 
-saldo.example.com {
+https://saldo.erikartaz.work {
 	encode zstd gzip
 
 	# Documentazione API e schema OpenAPI: meglio non esporli pubblicamente.
@@ -58,7 +58,7 @@ saldo.example.com {
 	# }
 	# ---------------------------------------------------------------------------
 
-	reverse_proxy 127.0.0.1:8000 {
+	reverse_proxy 192.168.1.11:8090 {
 		# Caddy inoltra già Authorization e X-Forwarded-For.
 		header_up X-Forwarded-Proto {scheme}
 		header_up X-Forwarded-Host {host}

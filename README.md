@@ -95,19 +95,19 @@ Sono inclusi `Dockerfile`, `docker-compose.yml` e `.dockerignore`, oltre alla gu
 docker compose up -d --build
 ```
 
-L'app sarà su `http://127.0.0.1:8000`; i dati stanno nel volume nominato `saldo_data`. Il container gira come utente non-root, ha un healthcheck e riavvio automatico.
+L'app sarà su `http://127.0.0.1:8090`; i dati stanno nel volume nominato `saldo_data`. Il container gira come utente non-root, ha un healthcheck e riavvio automatico. La porta `8090` è la porta host, mappata alla `8000` interna del container.
 
 Variabili principali:
 
 ```text
 SALDO_JWT_SECRET=...                  # consigliata in produzione
 SALDO_ACCESS_TOKEN_EXPIRE_MINUTES=10080
-SALDO_PORT=8000
-SALDO_BIND_IP=0.0.0.0                 # Caddy esterno raggiunge l'host su 8000
+SALDO_PORT=8090                       # la 8000 è già occupata sulla VM
+SALDO_BIND_IP=0.0.0.0                 # Caddy esterno raggiunge l'host su 8090
 TZ=Europe/Rome
 ```
 
-Il container pubblica la porta `8000` sull'host Docker; il Caddy già presente nel homelab (LXC o container separato) deve fare `reverse_proxy http://IP-DELL-HOST-DOCKER:8000`. Limita la porta con il firewall all'IP di Caddy: l'unica porta pubblica deve essere quella di Caddy (80/443).
+Il container pubblica la porta `8090` sull'host Docker `192.168.1.11`; il Caddy già presente nel homelab deve fare `reverse_proxy 192.168.1.11:8090`. Limita la porta con il firewall all'IP di Caddy: l'unica porta pubblica deve essere quella di Caddy (80/443).
 
 Per Portainer: **Stacks → Add stack → Repository**, URL del repository, branch `main`, compose path `docker-compose.yml`. I dettagli, incluso il reverse proxy e il backup del volume, sono in [deploy/PORTAINER.md](deploy/PORTAINER.md).
 
@@ -144,7 +144,7 @@ Le variabili d'ambiente usano il prefisso `SALDO_` e possono essere definite in 
 
 Saldo è progettato per `localhost`. Se vuoi raggiungerlo da fuori, l'ordine corretto è: segreto JWT stabile, backend raggiungibile solo dal reverse proxy, Caddy con HTTPS e, se possibile, una VPN o un livello di autenticazione aggiuntivo.
 
-> Se usi Docker/Portainer con Caddy in un LXC separato, segui [deploy/PORTAINER.md](deploy/PORTAINER.md): il container pubblica `8000` sull'host Docker e Caddy usa `reverse_proxy http://IP-DELL-HOST:8000`. La parte seguente descrive l'installazione bare-metal con Caddy sullo stesso host.
+> Se usi Docker/Portainer con Caddy in un LXC separato, segui [deploy/PORTAINER.md](deploy/PORTAINER.md): il container pubblica `8090` sull'host Docker e Caddy usa `reverse_proxy 192.168.1.11:8090`. La parte seguente descrive l'installazione bare-metal con Caddy sullo stesso host.
 
 ### 1. Token di sessione e segreto JWT
 

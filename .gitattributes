@@ -1,0 +1,11 @@
+* text=auto
+
+# Docker e file di configurazione devono restare LF anche su Windows.
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+
+# Gli script PowerShell restano in stile Windows.
+*.ps1 text eol=crlf
+*.bat text eol=crlf

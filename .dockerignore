@@ -1,0 +1,41 @@
+# Git e metadati
+.git
+.github
+.gitignore
+.vscode
+.idea
+
+# Python
+**/__pycache__
+**/*.pyc
+.venv
+**/.venv
+.pytest_cache
+.ruff_cache
+backend/tests
+backend/data
+.uv-cache
+
+# Node
+node_modules
+**/node_modules
+frontend/dist
+.npm-cache
+
+# Tooling locale e screenshot
+.tmp
+.screens
+.chrome-*
+docs
+deploy
+
+# Configurazioni e segreti (non devono finire nell'immagine)
+.env
+.env.*
+!.env.example
+
+# File non necessari al runtime
+README.md
+start.ps1
+dev.ps1
+uv.toml

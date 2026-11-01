@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+backend/data/
+backend/tests/test_saldo.db*
+backend/pytest-cache-files-*/
+.uv-cache/
+
+# Node
+node_modules/
+frontend/dist/
+*.local
+.npm-cache/
+
+# Local tooling / previews
+.tmp/
+.screens/
+.chrome-*/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example

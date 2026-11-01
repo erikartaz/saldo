@@ -1,0 +1,41 @@
+services:
+  saldo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: saldo:local
+    restart: unless-stopped
+    init: true
+    ports:
+      # Caddy è esterno a questo stack (LXC/container separato): deve poter
+      # raggiungere la porta 8000 dell'host Docker. Limita la porta con il
+      # firewall all'IP di Caddy. Se Caddy è sullo stesso host, imposta
+      # SALDO_BIND_IP=127.0.0.1.
+      - "${SALDO_BIND_IP:-0.0.0.0}:${SALDO_PORT:-8000}:8000"
+    environment:
+      SALDO_DATABASE_URL: "sqlite:////app/backend/data/saldo.db"
+      # Se vuoto, Saldo genera un segreto persistente in /app/backend/data/.secret.
+      # In Portainer conviene impostarlo come variabile di stack.
+      SALDO_JWT_SECRET: "${SALDO_JWT_SECRET:-}"
+      SALDO_ACCESS_TOKEN_EXPIRE_MINUTES: "${SALDO_ACCESS_TOKEN_EXPIRE_MINUTES:-10080}"
+      TZ: "${TZ:-Europe/Rome}"
+    volumes:
+      - saldo_data:/app/backend/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  saldo_data:
+    name: saldo_data

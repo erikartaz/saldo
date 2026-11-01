@@ -1,0 +1,87 @@
+import {
+  ArrowLeftRight,
+  Baby,
+  Banknote,
+  Briefcase,
+  Car,
+  CircleHelp,
+  Coffee,
+  CreditCard,
+  Dumbbell,
+  Fuel,
+  Gamepad2,
+  Gift,
+  GraduationCap,
+  HeartPulse,
+  House,
+  Landmark,
+  LineChart,
+  MoreHorizontal,
+  PawPrint,
+  PiggyBank,
+  Plane,
+  PlusCircle,
+  Repeat,
+  Shirt,
+  ShoppingCart,
+  Smartphone,
+  Tag,
+  Target,
+  TrainFront,
+  TrendingUp,
+  Undo2,
+  Utensils,
+  Wallet,
+  Wifi,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react'
+
+const ICONS: Record<string, LucideIcon> = {
+  wallet: Wallet,
+  landmark: Landmark,
+  'piggy-bank': PiggyBank,
+  banknote: Banknote,
+  'credit-card': CreditCard,
+  'chart-line': LineChart,
+  'shopping-cart': ShoppingCart,
+  house: House,
+  car: Car,
+  'heart-pulse': HeartPulse,
+  'gamepad-2': Gamepad2,
+  utensils: Utensils,
+  shirt: Shirt,
+  repeat: Repeat,
+  'graduation-cap': GraduationCap,
+  plane: Plane,
+  briefcase: Briefcase,
+  gift: Gift,
+  'trending-up': TrendingUp,
+  'undo-2': Undo2,
+  'plus-circle': PlusCircle,
+  target: Target,
+  tag: Tag,
+  coffee: Coffee,
+  smartphone: Smartphone,
+  wifi: Wifi,
+  dumbbell: Dumbbell,
+  'paw-print': PawPrint,
+  baby: Baby,
+  wrench: Wrench,
+  fuel: Fuel,
+  'train-front': TrainFront,
+  'arrow-left-right': ArrowLeftRight,
+  'circle-help': CircleHelp,
+  'more-horizontal': MoreHorizontal,
+}
+
+interface AppIconProps {
+  name: string
+  className?: string
+  strokeWidth?: number
+}
+
+export function AppIcon({ name, className, strokeWidth = 1.8 }: AppIconProps) {
+  const Icon = ICONS[name] ?? Tag
+  return <Icon className={className} strokeWidth={strokeWidth} aria-hidden="true" />
+}

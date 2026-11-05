@@ -13,7 +13,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { api } from '../lib/api'
-import type { Account, Category, Transaction, TransactionPage, TransactionType } from '../types'
+import type { Account, Category, Payee, Transaction, TransactionPage, TransactionType } from '../types'
 import { useToast } from '../context/ToastContext'
 import { formatCurrency, formatDate, formatPercent, formatSignedAmount, relativeDay } from '../lib/format'
 import { cn, todayISO } from '../lib/utils'
@@ -96,6 +96,7 @@ export function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [accountFilter, setAccountFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [payeeFilter, setPayeeFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
@@ -108,7 +109,7 @@ export function TransactionsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedQ, typeFilter, accountFilter, categoryFilter, dateFrom, dateTo])
+  }, [debouncedQ, typeFilter, accountFilter, categoryFilter, payeeFilter, dateFrom, dateTo])
 
   useEffect(() => {
     if (searchParams.get('new') !== '1') return
@@ -127,15 +128,20 @@ export function TransactionsPage() {
     queryKey: ['categories'],
     queryFn: () => api.get<Category[]>('/categories'),
   })
+  const payeesQuery = useQuery({
+    queryKey: ['payees', 'filter'],
+    queryFn: () => api.get<Payee[]>('/payees', { limit: 1000, sort: 'name' }),
+  })
 
   const transactionsQuery = useQuery({
-    queryKey: ['transactions', debouncedQ, typeFilter, accountFilter, categoryFilter, dateFrom, dateTo, page],
+    queryKey: ['transactions', debouncedQ, typeFilter, accountFilter, categoryFilter, payeeFilter, dateFrom, dateTo, page],
     queryFn: () =>
       api.get<TransactionPage>('/transactions', {
         q: debouncedQ || undefined,
         type: typeFilter === 'all' ? undefined : typeFilter,
         account_id: accountFilter || undefined,
         category_id: categoryFilter || undefined,
+        payee_id: payeeFilter || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         page,
@@ -156,6 +162,7 @@ export function TransactionsPage() {
 
   const accounts = accountsQuery.data ?? []
   const categories = categoriesQuery.data ?? []
+  const payees = payeesQuery.data ?? []
   const data = transactionsQuery.data
   const items = data?.items ?? []
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1
@@ -165,6 +172,7 @@ export function TransactionsPage() {
     (typeFilter !== 'all' ? 1 : 0) +
     (accountFilter ? 1 : 0) +
     (categoryFilter ? 1 : 0) +
+    (payeeFilter ? 1 : 0) +
     (dateFrom ? 1 : 0) +
     (dateTo ? 1 : 0)
 
@@ -173,6 +181,7 @@ export function TransactionsPage() {
     setTypeFilter('all')
     setAccountFilter('')
     setCategoryFilter('')
+    setPayeeFilter('')
     setDateFrom('')
     setDateTo('')
   }
@@ -262,7 +271,7 @@ export function TransactionsPage() {
             <Input
               value={q}
               onChange={(event) => setQ(event.target.value)}
-              placeholder="Cerca descrizione o note…"
+              placeholder="Cerca descrizione, note o beneficiario…"
               className="pl-10"
               aria-label="Cerca movimenti"
             />
@@ -287,7 +296,7 @@ export function TransactionsPage() {
         </div>
 
         {showFilters ? (
-          <div className="mt-3 grid gap-2 border-t border-line pt-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-3 grid gap-2 border-t border-line pt-3 sm:grid-cols-2 lg:grid-cols-5">
             <Select
               value={accountFilter}
               onChange={(event) => setAccountFilter(event.target.value)}
@@ -324,6 +333,18 @@ export function TransactionsPage() {
                     </option>
                   ))}
               </optgroup>
+            </Select>
+            <Select
+              value={payeeFilter}
+              onChange={(event) => setPayeeFilter(event.target.value)}
+              aria-label="Filtra per beneficiario"
+            >
+              <option value="">Tutti i beneficiari</option>
+              {payees.map((payee) => (
+                <option key={payee.id} value={payee.id}>
+                  {payee.name}
+                </option>
+              ))}
             </Select>
             <Input
               type="date"
@@ -363,6 +384,11 @@ export function TransactionsPage() {
             {categoryFilter ? (
               <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-ink">
                 {categories.find((category) => String(category.id) === categoryFilter)?.name}
+              </span>
+            ) : null}
+            {payeeFilter ? (
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-ink">
+                {payees.find((payee) => String(payee.id) === payeeFilter)?.name}
               </span>
             ) : null}
             {dateFrom ? (
@@ -408,12 +434,13 @@ export function TransactionsPage() {
         <>
           <div className="card hidden overflow-hidden md:block">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left">
+              <table className="w-full min-w-[900px] text-left">
                 <thead>
                   <tr className="border-b border-line bg-surface-2/60 text-[10px] font-semibold uppercase tracking-[0.09em] text-muted">
                     <th className="px-5 py-3 font-semibold">Data</th>
                     <th className="px-3 py-3 font-semibold">Descrizione</th>
                     <th className="px-3 py-3 font-semibold">Categoria</th>
+                    <th className="px-3 py-3 font-semibold">Beneficiario</th>
                     <th className="px-3 py-3 font-semibold">Conto</th>
                     <th className="px-3 py-3 text-right font-semibold">Importo</th>
                     <th className="px-5 py-3 text-right font-semibold">Azioni</th>
@@ -464,6 +491,9 @@ export function TransactionsPage() {
                             {transaction.type === 'transfer' ? 'Trasferimento' : 'Senza categoria'}
                           </span>
                         )}
+                      </td>
+                      <td className="max-w-[150px] truncate px-3 py-3 text-[12px] text-muted">
+                        {transaction.payee?.name ?? '—'}
                       </td>
                       <td className="px-3 py-3 text-[12px] text-muted">
                         {transaction.type === 'transfer' ? (
@@ -526,7 +556,8 @@ export function TransactionsPage() {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[13px] font-semibold text-ink">{transaction.description}</p>
                           <p className="truncate text-[11px] text-muted">
-                            {transaction.category?.name ?? (transaction.type === 'transfer' ? 'Trasferimento' : 'Senza categoria')}{' '}
+                            {transaction.category?.name ?? (transaction.type === 'transfer' ? 'Trasferimento' : 'Senza categoria')}
+                            {transaction.payee ? ` · ${transaction.payee.name}` : ''}{' '}
                             · {transaction.type === 'transfer' ? `${transaction.account.name} → ${transaction.transfer_account?.name}` : transaction.account.name}
                           </p>
                         </div>

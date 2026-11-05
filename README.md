@@ -7,11 +7,13 @@
 ## Funzionalità
 
 - **Conti multipli** — conto corrente, risparmio, contanti, carta di credito, investimenti; saldo calcolato automaticamente, archiviazione e saldo iniziale.
-- **Movimenti** — entrate, spese e trasferimenti tra conti, categorie personalizzabili, note, ricerca e filtri per periodo, conto e categoria.
+- **Movimenti** — entrate, spese e trasferimenti tra conti, categorie personalizzabili, note, ricerca e filtri per periodo, conto, categoria e beneficiario.
+- **Beneficiari** — rubrica di negozi, fornitori, datori di lavoro e altre controparti, con categoria predefinita e statistiche dedicate. I campi di descrizione e beneficiario propongono le voci usate di recente.
+- **Trasferimenti rapidi** — trasferimenti tra conti con modelli “Prelievo contanti” e “Versamento contanti”.
 - **Budget mensili** — tetto di spesa per categoria, avanzamento in tempo reale, alert di sforamento, copia dei budget dal mese precedente.
 - **Ricorrenze e previsioni** — stipendio, affitto, abbonamenti; registrazione automatica o manuale e previsione di cassa dei prossimi 3 mesi.
 - **Obiettivi di risparmio** — traguardi con versamenti, anello di avanzamento e ritmo mensile necessario.
-- **Report** — andamento del patrimonio, entrate vs uscite, distribuzione per categoria, tasso di risparmio, dettaglio per periodo.
+- **Statistiche** — panoramica con confronto periodo/anno precedente, categorie, beneficiari, conti e matrice trasferimenti, budget vs effettivo, calendario delle spese e previsioni.
 - **Backup** — esportazione CSV dei movimenti e backup JSON completo.
 - **Sicurezza** — account singolo con password protetta da Argon2 e sessione JWT; database SQLite locale.
 - **Design** — Tailwind CSS 4, tema chiaro/scuro, layout responsive con sidebar su desktop e bottom navigation su mobile.
@@ -126,6 +128,12 @@ Le categorie di spesa e di entrata più comuni sono già presenti e possono esse
 - Segreto JWT generato al primo avvio: `backend/data/.secret`
 - Export: **Impostazioni → Dati e backup** (CSV dei movimenti o backup JSON completo)
 - Azzeramento: **Impostazioni → Zona pericolosa** richiede password e la parola `ELIMINA`
+
+### Migrazioni
+
+Il backend applica automaticamente le migrazioni additive all'avvio (tabella `schema_migrations`). L'introduzione dei beneficiari aggiunge `payees`, `transactions.payee_id` e `recurring_transactions.payee_id` senza toccare i movimenti esistenti.
+
+Prima di aggiornare un'installazione con dati reali, fai un backup del volume `saldo_data` o del file `backend/data/saldo.db`. La migrazione è idempotente: può essere eseguita più volte senza creare duplicati.
 
 Per spostare l'app su un altro computer è sufficiente copiare la cartella `backend/data` (a app spenta) e il progetto.
 
@@ -272,7 +280,7 @@ cd backend
 uv run pytest
 ```
 
-I test coprono autenticazione, conti, movimenti, trasferimenti, budget, obiettivi, ricorrenze, dashboard, report, export e reset dei dati.
+I test coprono autenticazione, conti, movimenti, trasferimenti, beneficiari, suggerimenti, budget, obiettivi, ricorrenze, dashboard, statistiche, export e reset dei dati.
 
 ## Struttura del progetto
 
@@ -284,14 +292,16 @@ I test coprono autenticazione, conti, movimenti, trasferimenti, budget, obiettiv
 │  │  ├─ models.py        # modelli SQLAlchemy
 │  │  ├─ schemas.py       # schemi Pydantic
 │  │  ├─ services.py      # saldi, budget, previsioni, aggregazioni
+│  │  ├─ analytics.py     # statistiche, beneficiari, conti, calendario
+│  │  ├─ migrations.py    # migrazioni SQLite idempotenti
 │  │  ├─ serializers.py   # output API
-│  │  └─ routers/         # auth, conti, categorie, movimenti, budget, ricorrenti, obiettivi, report, impostazioni
+│  │  └─ routers/         # auth, conti, categorie, beneficiari, movimenti, suggerimenti, budget, ricorrenti, obiettivi, statistiche, impostazioni
 │  ├─ tests/
 │  └─ data/               # database e segreto (non versionati)
 ├─ frontend/
 │  ├─ src/
-│  │  ├─ pages/           # dashboard, movimenti, conti, categorie, budget, ricorrenti, obiettivi, report, impostazioni, login
-│  │  ├─ components/      # layout, UI kit, grafici, modali
+│  │  ├─ pages/           # dashboard, movimenti, conti, categorie, beneficiari, budget, ricorrenti, obiettivi, statistiche, impostazioni, login
+│  │  ├─ components/      # layout, UI kit, grafici, modali, autocomplete
 │  │  ├─ context/         # auth, tema, toast
 │  │  └─ lib/             # client API, formattazione, utility, icone
 │  └─ dist/               # build servita da FastAPI (non versionata)
@@ -317,9 +327,13 @@ Saldo è progettato per uso personale su una macchina locale. Non effettua chiam
 | --- | --- |
 | ![Movimenti](docs/screenshots/transactions.png) | ![Budget su mobile](docs/screenshots/budget-mobile.png) |
 
-| Report | Tema scuro |
+| Beneficiari | Statistiche |
 | --- | --- |
-| ![Report](docs/screenshots/reports.png) | ![Dashboard in tema scuro](docs/screenshots/dashboard-dark.png) |
+| ![Beneficiari](docs/screenshots/payees.png) | ![Statistiche](docs/screenshots/statistics.png) |
+
+| Tema scuro |
+| --- |
+| ![Dashboard in tema scuro](docs/screenshots/dashboard-dark.png) |
 
 ---
 

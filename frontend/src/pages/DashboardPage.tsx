@@ -58,6 +58,7 @@ function MovementRow({ transaction }: { transaction: Transaction }) {
         <p className="truncate text-[13px] font-semibold text-ink">{transaction.description}</p>
         <p className="truncate text-[11px] text-muted">
           {transaction.category?.name ?? (isTransfer ? 'Trasferimento' : 'Senza categoria')}
+          {transaction.payee ? ` · ${transaction.payee.name}` : ''}
           {transaction.transfer_account ? ` → ${transaction.transfer_account.name}` : ` · ${transaction.account.name}`}
         </p>
       </div>

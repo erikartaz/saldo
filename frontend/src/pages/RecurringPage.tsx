@@ -21,7 +21,9 @@ import type {
   CategoryType,
   Forecast,
   Frequency,
+  Payee,
   Recurring,
+  SuggestionItem,
   TransactionType,
 } from '../types'
 import { useToast } from '../context/ToastContext'
@@ -37,6 +39,8 @@ import { AppIcon } from '../lib/icons'
 import { Button, IconButton } from '../components/ui/Button'
 import { Field, FormError, Input, Select, Textarea } from '../components/ui/Field'
 import { ConfirmDialog, Modal } from '../components/ui/Modal'
+import { Combobox } from '../components/ui/Combobox'
+import { PayeeField } from '../components/PayeeField'
 import {
   Badge,
   EmptyState,
@@ -77,6 +81,7 @@ function RecurringModal({ open, onClose, recurring }: RecurringModalProps) {
   const [amount, setAmount] = useState('')
   const [accountId, setAccountId] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [payeeId, setPayeeId] = useState<number | null>(null)
   const [transferAccountId, setTransferAccountId] = useState('')
   const [frequency, setFrequency] = useState<Frequency>('monthly')
   const [interval, setInterval] = useState('1')
@@ -97,6 +102,17 @@ function RecurringModal({ open, onClose, recurring }: RecurringModalProps) {
     queryFn: () => api.get<Category[]>('/categories'),
     enabled: open,
   })
+  const suggestionsQuery = useQuery({
+    queryKey: ['description-suggestions', type],
+    queryFn: () =>
+      api.get<{ items: SuggestionItem[] }>('/suggestions/descriptions', { type, limit: 20 }),
+    enabled: open,
+  })
+  const suggestionOptions = (suggestionsQuery.data?.items ?? []).map((item) => ({
+    value: item.value,
+    label: item.value,
+    hint: item.category_name ?? undefined,
+  }))
   const accounts = (accountsQuery.data ?? []).filter(
     (account) => !account.archived || account.id === recurring?.account_id,
   )
@@ -111,6 +127,7 @@ function RecurringModal({ open, onClose, recurring }: RecurringModalProps) {
       setAmount(String(recurring.amount).replace('.', ','))
       setAccountId(String(recurring.account_id))
       setCategoryId(recurring.category_id ? String(recurring.category_id) : '')
+      setPayeeId(recurring.payee_id)
       setTransferAccountId(recurring.transfer_account_id ? String(recurring.transfer_account_id) : '')
       setFrequency(recurring.frequency)
       setInterval(String(recurring.interval))
@@ -125,6 +142,7 @@ function RecurringModal({ open, onClose, recurring }: RecurringModalProps) {
       setAmount('')
       setAccountId('')
       setCategoryId('')
+      setPayeeId(null)
       setTransferAccountId('')
       setFrequency('monthly')
       setInterval('1')
@@ -161,6 +179,12 @@ function RecurringModal({ open, onClose, recurring }: RecurringModalProps) {
     onError: (mutationError: Error) => setError(mutationError.message),
   })
 
+  const handlePayeeSelected = (payee: Payee | null) => {
+    if (!payee?.default_category) return
+    if (payee.default_category.type !== type) return
+    if (!categoryId) setCategoryId(String(payee.default_category.id))
+  }
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
@@ -193,6 +217,7 @@ function RecurringModal({ open, onClose, recurring }: RecurringModalProps) {
       description: description.trim(),
       account_id: Number(accountId),
       category_id: type === 'transfer' || !categoryId ? null : Number(categoryId),
+      payee_id: type === 'transfer' || payeeId === null ? null : payeeId,
       transfer_account_id: type === 'transfer' ? Number(transferAccountId) : null,
       frequency,
       interval: Math.max(1, Number(interval) || 1),
@@ -230,20 +255,27 @@ function RecurringModal({ open, onClose, recurring }: RecurringModalProps) {
           value={type}
           onChange={(value) => {
             setType(value)
-            if (value === 'transfer') setCategoryId('')
-            else setTransferAccountId('')
+            if (value === 'transfer') {
+              setCategoryId('')
+              setPayeeId(null)
+            } else {
+              setTransferAccountId('')
+            }
           }}
           fullWidth
         />
 
         <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
           <Field label="Descrizione" htmlFor="rec-description">
-            <Input
+            <Combobox
               id="rec-description"
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={setDescription}
+              onSelect={(option) => setDescription(option.label)}
+              options={suggestionOptions}
               placeholder="Es. Affitto, Netflix, Stipendio…"
-              maxLength={200}
+              loading={suggestionsQuery.isLoading}
+              emptyText="Scrivi una nuova descrizione"
             />
           </Field>
           <Field label="Importo" htmlFor="rec-amount">
@@ -260,6 +292,23 @@ function RecurringModal({ open, onClose, recurring }: RecurringModalProps) {
             </div>
           </Field>
         </div>
+
+        {type !== 'transfer' ? (
+          <Field
+            label={type === 'income' ? 'Pagatore' : 'Beneficiario'}
+            htmlFor="rec-payee"
+            hint="Facoltativo. Scrivi un nome e scegli «Crea beneficiario» per aggiungerlo."
+          >
+            <PayeeField
+              key={`${type}-${recurring?.id ?? 'new'}`}
+              id="rec-payee"
+              value={payeeId}
+              onChange={setPayeeId}
+              onPayeeSelected={handlePayeeSelected}
+              type={type}
+            />
+          </Field>
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={type === 'transfer' ? 'Dal conto' : 'Conto'} htmlFor="rec-account">

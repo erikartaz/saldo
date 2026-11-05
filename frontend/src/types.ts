@@ -29,6 +29,34 @@ export interface CategoryRef {
   name: string
   color: string
   icon: string
+  type: CategoryType
+}
+
+export interface PayeeRef {
+  id: number
+  name: string
+  default_category: CategoryRef | null
+}
+
+export interface Payee {
+  id: number
+  name: string
+  default_category_id: number | null
+  default_category: CategoryRef | null
+  notes: string | null
+  archived: boolean
+  transaction_count: number
+  expense_total: number
+  income_total: number
+  last_used: string | null
+  created_at: string
+}
+
+export interface SuggestionItem {
+  value: string
+  category_name: string | null
+  count: number
+  last_used: string | null
 }
 
 export interface Account {
@@ -70,6 +98,8 @@ export interface Transaction {
   account: AccountRef
   category_id: number | null
   category: CategoryRef | null
+  payee_id: number | null
+  payee: PayeeRef | null
   transfer_account_id: number | null
   transfer_account: AccountRef | null
   recurring_id: number | null
@@ -130,6 +160,8 @@ export interface Recurring {
   account: AccountRef
   category_id: number | null
   category: CategoryRef | null
+  payee_id: number | null
+  payee: PayeeRef | null
   transfer_account_id: number | null
   transfer_account: AccountRef | null
   monthly_equivalent: number
@@ -272,6 +304,151 @@ export interface AuthStatus {
   needs_setup: boolean
 }
 
+export interface LargestExpense {
+  amount: number
+  description: string
+  date: string
+  category_name: string | null
+}
+
+export interface SummaryValues {
+  income: number
+  expense: number
+  net: number
+  savings_rate: number
+  transaction_count: number
+  expense_count: number
+  avg_expense: number
+  daily_average: number
+  active_days: number
+  recurring_expense: number
+  recurring_share: number
+  largest_expense: LargestExpense | null
+}
+
+export interface SummaryComparison {
+  current: SummaryValues
+  previous: SummaryValues
+  previous_year: SummaryValues
+  income_change: number | null
+  expense_change: number | null
+  net_change: number | null
+  savings_rate_change: number | null
+}
+
+export interface Summary {
+  date_from: string
+  date_to: string
+  comparison: SummaryComparison
+  series: MonthPoint[]
+}
+
+export interface DailySpendPoint {
+  date: string
+  amount: number
+  count: number
+}
+
+export interface WeekdaySpendPoint {
+  weekday: number
+  label: string
+  amount: number
+  count: number
+}
+
+export interface CalendarStats {
+  date_from: string
+  date_to: string
+  daily: DailySpendPoint[]
+  weekday: WeekdaySpendPoint[]
+  total: number
+  active_days: number
+}
+
+export interface PayeeStat {
+  payee_id: number | null
+  name: string
+  default_category: CategoryRef | null
+  amount: number
+  count: number
+  average: number
+  percentage: number
+  last_used: string | null
+}
+
+export interface PayeeReport {
+  date_from: string
+  date_to: string
+  type: CategoryType
+  total: number
+  items: PayeeStat[]
+  top5_share: number
+  unassigned_amount: number
+}
+
+export interface PayeeMonthlyPoint {
+  month: string
+  label: string
+  amount: number
+  count: number
+}
+
+export interface PayeeDetail {
+  date_from: string
+  date_to: string
+  payee: PayeeRef
+  total: number
+  count: number
+  average: number
+  monthly: PayeeMonthlyPoint[]
+  categories: CategorySlice[]
+  last_used: string | null
+}
+
+export interface AccountFlow {
+  id: number
+  name: string
+  type: string
+  color: string
+  balance: number
+  income: number
+  expense: number
+  transfer_in: number
+  transfer_out: number
+  net: number
+}
+
+export interface TransferCell {
+  from_account_id: number
+  from_account_name: string
+  to_account_id: number
+  to_account_name: string
+  amount: number
+  count: number
+}
+
+export interface AccountsReport {
+  date_from: string
+  date_to: string
+  total_balance: number
+  accounts: AccountFlow[]
+  transfers: TransferCell[]
+}
+
+export interface BudgetHistoryPoint {
+  month: string
+  label: string
+  total_budget: number
+  total_spent: number
+  remaining: number
+  over_count: number
+  adherence: number
+}
+
+export interface BudgetHistory {
+  months: BudgetHistoryPoint[]
+}
+
 export interface TransactionInput {
   type: TransactionType
   amount: number
@@ -279,6 +456,7 @@ export interface TransactionInput {
   description: string
   account_id: number
   category_id: number | null
+  payee_id: number | null
   transfer_account_id: number | null
   notes: string | null
 }

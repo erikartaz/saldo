@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import Transaction, User
+from ..models import Payee, Transaction, User
 from ..schemas import (
     TransactionCreate,
     TransactionOut,
@@ -18,6 +18,7 @@ from ..schemas import (
 from ..serializers import transaction_out
 from ..services import (
     from_cents,
+    owned_payee,
     to_cents,
     transaction_with_relations,
     validate_transaction_links,
@@ -32,13 +33,20 @@ def _filters(
     tx_type: str | None,
     account_id: int | None,
     category_id: int | None,
+    payee_id: int | None,
     date_from: date | None,
     date_to: date | None,
 ):
     conditions = [Transaction.user_id == user_id]
     if q:
         pattern = f"%{q.strip()}%"
-        conditions.append(or_(Transaction.description.ilike(pattern), Transaction.notes.ilike(pattern)))
+        conditions.append(
+            or_(
+                Transaction.description.ilike(pattern),
+                Transaction.notes.ilike(pattern),
+                Transaction.payee.has(Payee.name.ilike(pattern)),
+            )
+        )
     if tx_type:
         conditions.append(Transaction.type == tx_type)
     if account_id:
@@ -50,11 +58,25 @@ def _filters(
         )
     if category_id:
         conditions.append(Transaction.category_id == category_id)
+    if payee_id:
+        conditions.append(Transaction.payee_id == payee_id)
     if date_from:
         conditions.append(Transaction.date >= date_from)
     if date_to:
         conditions.append(Transaction.date <= date_to)
     return conditions
+
+
+def _default_category_for_payee(
+    db: Session, user_id: int, payload: TransactionCreate
+) -> int | None:
+    if payload.category_id is not None or payload.payee_id is None:
+        return payload.category_id
+    payee = owned_payee(db, user_id, payload.payee_id)
+    expected = "income" if payload.type == "income" else "expense"
+    if payee.default_category and payee.default_category.type == expected:
+        return payee.default_category_id
+    return None
 
 
 @router.get("", response_model=TransactionPage)
@@ -63,6 +85,7 @@ def list_transactions(
     tx_type: str | None = Query(default=None, alias="type"),
     account_id: int | None = None,
     category_id: int | None = None,
+    payee_id: int | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     page: int = Query(default=1, ge=1),
@@ -70,7 +93,7 @@ def list_transactions(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> TransactionPage:
-    conditions = _filters(user.id, q, tx_type, account_id, category_id, date_from, date_to)
+    conditions = _filters(user.id, q, tx_type, account_id, category_id, payee_id, date_from, date_to)
 
     total = db.scalar(select(func.count(Transaction.id)).where(*conditions)) or 0
     totals_rows = db.execute(
@@ -88,6 +111,7 @@ def list_transactions(
         .options(
             joinedload(Transaction.account),
             joinedload(Transaction.category),
+            joinedload(Transaction.payee).joinedload(Payee.default_category),
             joinedload(Transaction.transfer_account),
         )
         .where(*conditions)
@@ -135,13 +159,16 @@ def create_transaction(
         user.id,
         account_id=payload.account_id,
         category_id=payload.category_id,
+        payee_id=payload.payee_id,
         transfer_account_id=payload.transfer_account_id,
         tx_type=payload.type,
     )
+    category_id = _default_category_for_payee(db, user.id, payload)
     tx = Transaction(
         user_id=user.id,
         account_id=payload.account_id,
-        category_id=payload.category_id,
+        category_id=category_id,
+        payee_id=payload.payee_id,
         transfer_account_id=payload.transfer_account_id,
         type=payload.type,
         amount_cents=to_cents(payload.amount),
@@ -173,11 +200,13 @@ def update_transaction(
         user.id,
         account_id=payload.account_id,
         category_id=payload.category_id,
+        payee_id=payload.payee_id,
         transfer_account_id=payload.transfer_account_id,
         tx_type=payload.type,
     )
     tx.account_id = payload.account_id
-    tx.category_id = payload.category_id
+    tx.category_id = _default_category_for_payee(db, user.id, payload)
+    tx.payee_id = payload.payee_id
     tx.transfer_account_id = payload.transfer_account_id
     tx.type = payload.type
     tx.amount_cents = to_cents(payload.amount)

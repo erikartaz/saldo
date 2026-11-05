@@ -88,6 +88,8 @@ Evita di pubblicare la porta 8090 su Internet senza proxy: SQLite e il login non
 
 ## 5. Aggiornamenti
 
+Prima di aggiornare un'installazione con dati reali, fai un backup del volume `saldo_data` (sezione 6). All'avvio il backend applica automaticamente le migrazioni additive necessarie.
+
 Dopo un push su `main`:
 
 - in Portainer apri lo stack e usa **Pull and redeploy** (ricostruisce l'immagine);

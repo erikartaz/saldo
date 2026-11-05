@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import Account, Budget, Category, Goal, GoalContribution, RecurringTransaction, Transaction, User
+from ..models import Account, Budget, Category, Goal, GoalContribution, Payee, RecurringTransaction, Transaction, User
 from ..schemas import SettingsOut
 from ..security import verify_password
 from ..seed import seed_default_categories
@@ -77,6 +77,7 @@ def reset_data(
         .delete(synchronize_session=False),
         "goals": db.query(Goal).filter(Goal.user_id == user.id).delete(synchronize_session=False),
         "accounts": db.query(Account).filter(Account.user_id == user.id).delete(synchronize_session=False),
+        "payees": db.query(Payee).filter(Payee.user_id == user.id).delete(synchronize_session=False),
         "categories": db.query(Category).filter(Category.user_id == user.id).delete(synchronize_session=False),
     }
     db.commit()

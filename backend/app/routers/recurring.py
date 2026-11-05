@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import RecurringTransaction, Transaction, User
+from ..models import Payee, RecurringTransaction, Transaction, User
 from ..schemas import (
     ForecastOut,
     PostDueOut,
@@ -36,6 +36,7 @@ def _rec_or_404(db: Session, user_id: int, rec_id: int) -> RecurringTransaction:
         .options(
             joinedload(RecurringTransaction.account),
             joinedload(RecurringTransaction.category),
+            joinedload(RecurringTransaction.payee).joinedload(Payee.default_category),
             joinedload(RecurringTransaction.transfer_account),
         )
         .where(RecurringTransaction.id == rec_id, RecurringTransaction.user_id == user_id)
@@ -55,6 +56,7 @@ def list_recurring(
         .options(
             joinedload(RecurringTransaction.account),
             joinedload(RecurringTransaction.category),
+            joinedload(RecurringTransaction.payee).joinedload(Payee.default_category),
             joinedload(RecurringTransaction.transfer_account),
         )
         .where(RecurringTransaction.user_id == user.id)
@@ -74,6 +76,7 @@ def create_recurring(
         user.id,
         account_id=payload.account_id,
         category_id=payload.category_id,
+        payee_id=payload.payee_id,
         transfer_account_id=payload.transfer_account_id,
         tx_type=payload.type,
     )
@@ -81,6 +84,7 @@ def create_recurring(
         user_id=user.id,
         account_id=payload.account_id,
         category_id=payload.category_id,
+        payee_id=payload.payee_id,
         transfer_account_id=payload.transfer_account_id,
         type=payload.type,
         amount_cents=to_cents(payload.amount),
@@ -113,11 +117,14 @@ def update_recurring(
     effective_type = data.get("type", rec.type)
     effective_account = data.get("account_id", rec.account_id)
     effective_category = data.get("category_id", rec.category_id)
+    effective_payee = data.get("payee_id", rec.payee_id)
     effective_transfer = data.get("transfer_account_id", rec.transfer_account_id)
 
     if effective_type == "transfer":
         effective_category = None
+        effective_payee = None
         data["category_id"] = None
+        data["payee_id"] = None
     else:
         effective_transfer = None
         data["transfer_account_id"] = None
@@ -130,6 +137,7 @@ def update_recurring(
         user.id,
         account_id=effective_account,
         category_id=effective_category,
+        payee_id=effective_payee,
         transfer_account_id=effective_transfer,
         tx_type=effective_type,
     )
@@ -199,6 +207,7 @@ def post_single(
         user_id=user.id,
         account_id=rec.account_id,
         category_id=rec.category_id,
+        payee_id=rec.payee_id,
         transfer_account_id=rec.transfer_account_id,
         recurring_id=rec.id,
         type=rec.type,

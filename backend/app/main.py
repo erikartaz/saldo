@@ -10,16 +10,28 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
 from .config import settings
-from .database import Base, SessionLocal, engine
+from .database import SessionLocal, engine
+from .migrations import run_migrations
 from .models import User
-from .routers import accounts, auth, budgets, categories, goals, recurring, reports, settings as settings_router
+from .routers import (
+    accounts,
+    auth,
+    budgets,
+    categories,
+    goals,
+    payees,
+    recurring,
+    reports,
+    settings as settings_router,
+    suggestions,
+)
 from .routers import transactions
 from .services import post_due_recurring
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    run_migrations(engine)
     with SessionLocal() as db:
         for user in db.scalars(select(User)).all():
             try:
@@ -47,7 +59,9 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(accounts.router)
 app.include_router(categories.router)
+app.include_router(payees.router)
 app.include_router(transactions.router)
+app.include_router(suggestions.router)
 app.include_router(budgets.router)
 app.include_router(recurring.router)
 app.include_router(goals.router)

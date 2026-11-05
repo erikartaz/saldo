@@ -34,6 +34,7 @@ class User(Base):
 
     accounts: Mapped[list[Account]] = relationship(back_populates="user", cascade="all, delete-orphan")
     categories: Mapped[list[Category]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    payees: Mapped[list[Payee]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -76,11 +77,34 @@ class Category(Base):
     transactions: Mapped[list[Transaction]] = relationship(back_populates="category")
 
 
+class Payee(Base):
+    __tablename__ = "payees"
+    __table_args__ = (
+        UniqueConstraint("user_id", "normalized_name", name="uq_payee_user_normalized"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    default_category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="payees")
+    default_category: Mapped[Category | None] = relationship(foreign_keys=[default_category_id])
+    transactions: Mapped[list[Transaction]] = relationship(back_populates="payee")
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (
         Index("ix_transactions_user_date", "user_id", "date"),
         Index("ix_transactions_user_account_date", "user_id", "account_id", "date"),
+        Index("ix_transactions_user_payee_date", "user_id", "payee_id", "date"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -88,6 +112,9 @@ class Transaction(Base):
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id", ondelete="RESTRICT"), index=True)
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    payee_id: Mapped[int | None] = mapped_column(
+        ForeignKey("payees.id", ondelete="SET NULL"), nullable=True, index=True
     )
     transfer_account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=True, index=True
@@ -106,6 +133,7 @@ class Transaction(Base):
     account: Mapped[Account] = relationship(back_populates="transactions", foreign_keys=[account_id])
     transfer_account: Mapped[Account | None] = relationship(foreign_keys=[transfer_account_id])
     category: Mapped[Category | None] = relationship(back_populates="transactions")
+    payee: Mapped[Payee | None] = relationship(back_populates="transactions")
 
 
 class Budget(Base):
@@ -132,6 +160,9 @@ class RecurringTransaction(Base):
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
     )
+    payee_id: Mapped[int | None] = mapped_column(
+        ForeignKey("payees.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     transfer_account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id", ondelete="CASCADE"), nullable=True
     )
@@ -151,6 +182,7 @@ class RecurringTransaction(Base):
     account: Mapped[Account] = relationship(foreign_keys=[account_id])
     transfer_account: Mapped[Account | None] = relationship(foreign_keys=[transfer_account_id])
     category: Mapped[Category | None] = relationship()
+    payee: Mapped[Payee | None] = relationship()
 
 
 class Goal(Base):

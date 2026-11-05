@@ -12,7 +12,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { CategorySlice, ForecastMonth, MonthPoint, NetWorthPoint } from '../../types'
+import type {
+  BudgetHistoryPoint,
+  CategorySlice,
+  ForecastMonth,
+  MonthPoint,
+  NetWorthPoint,
+  PayeeMonthlyPoint,
+  WeekdaySpendPoint,
+} from '../../types'
 import { formatCompactCurrency, formatCurrency, formatPercent } from '../../lib/format'
 
 interface TooltipItem {
@@ -237,6 +245,117 @@ export function ForecastChart({ data, height = 220 }: { data: ForecastMonth[]; h
           <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--surface-2)' }} />
           <Bar dataKey="income" name="Entrate" fill="var(--accent)" radius={[6, 6, 0, 0]} maxBarSize={26} />
           <Bar dataKey="expense" name="Uscite" fill="#F97316" radius={[6, 6, 0, 0]} maxBarSize={26} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function MonthlyBars({ data, height = 260 }: { data: MonthPoint[]; height?: number }) {
+  return (
+    <div style={{ width: '100%', height }}>
+      <ResponsiveContainer>
+        <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barGap={4}>
+          <CartesianGrid {...gridProps} />
+          <XAxis
+            dataKey="label"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            tickFormatter={(value: string) => value.split(' ')[0]}
+          />
+          <YAxis
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            width={54}
+            tickFormatter={(value: number) => formatCompactCurrency(value)}
+          />
+          <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--surface-2)' }} />
+          <Bar dataKey="income" name="Entrate" fill="var(--accent)" radius={[5, 5, 0, 0]} maxBarSize={22} />
+          <Bar dataKey="expense" name="Uscite" fill="#F97316" radius={[5, 5, 0, 0]} maxBarSize={22} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function BudgetHistoryChart({ data, height = 260 }: { data: BudgetHistoryPoint[]; height?: number }) {
+  return (
+    <div style={{ width: '100%', height }}>
+      <ResponsiveContainer>
+        <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barGap={4}>
+          <CartesianGrid {...gridProps} />
+          <XAxis
+            dataKey="label"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            tickFormatter={(value: string) => value.split(' ')[0]}
+          />
+          <YAxis
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            width={54}
+            tickFormatter={(value: number) => formatCompactCurrency(value)}
+          />
+          <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--surface-2)' }} />
+          <Bar dataKey="total_budget" name="Budget" fill="var(--line-strong)" radius={[5, 5, 0, 0]} maxBarSize={24} />
+          <Bar dataKey="total_spent" name="Speso" fill="var(--accent)" radius={[5, 5, 0, 0]} maxBarSize={24} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function WeekdayChart({ data, height = 230 }: { data: WeekdaySpendPoint[]; height?: number }) {
+  return (
+    <div style={{ width: '100%', height }}>
+      <ResponsiveContainer>
+        <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+          <CartesianGrid {...gridProps} />
+          <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} tickMargin={8} />
+          <YAxis
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            width={54}
+            tickFormatter={(value: number) => formatCompactCurrency(value)}
+          />
+          <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--surface-2)' }} />
+          <Bar dataKey="amount" name="Spese" fill="var(--accent)" radius={[6, 6, 0, 0]} maxBarSize={34} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function PayeeMonthlyBars({ data, height = 220 }: { data: PayeeMonthlyPoint[]; height?: number }) {
+  return (
+    <div style={{ width: '100%', height }}>
+      <ResponsiveContainer>
+        <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+          <CartesianGrid {...gridProps} />
+          <XAxis
+            dataKey="label"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tickFormatter={(value: string) => value.split(' ')[0]}
+          />
+          <YAxis
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            width={54}
+            tickFormatter={(value: number) => formatCompactCurrency(value)}
+          />
+          <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--surface-2)' }} />
+          <Bar dataKey="amount" name="Spese" fill="var(--accent)" radius={[6, 6, 0, 0]} maxBarSize={28} />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -154,6 +154,7 @@ class CategoryRef(BaseModel):
     name: str
     color: str
     icon: str
+    type: CategoryType
 
 
 class CategoryOut(BaseModel):
@@ -168,6 +169,43 @@ class CategoryOut(BaseModel):
     budgeted: bool = False
 
 
+# ------------------------------------------------------------------------ payees
+class PayeeRef(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    default_category: CategoryRef | None = None
+
+
+class PayeeCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    default_category_id: int | None = None
+    notes: str | None = Field(default=None, max_length=1000)
+    archived: bool = False
+
+
+class PayeeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    default_category_id: int | None = None
+    notes: str | None = Field(default=None, max_length=1000)
+    archived: bool | None = None
+
+
+class PayeeOut(BaseModel):
+    id: int
+    name: str
+    default_category_id: int | None
+    default_category: CategoryRef | None
+    notes: str | None
+    archived: bool
+    transaction_count: int = 0
+    expense_total: float = 0
+    income_total: float = 0
+    last_used: date | None = None
+    created_at: datetime
+
+
 # -------------------------------------------------------------------- transactions
 class TransactionBase(BaseModel):
     type: TransactionType
@@ -176,6 +214,7 @@ class TransactionBase(BaseModel):
     description: str = Field(min_length=1, max_length=200)
     account_id: int
     category_id: int | None = None
+    payee_id: int | None = None
     transfer_account_id: int | None = None
     notes: str | None = Field(default=None, max_length=2000)
 
@@ -194,6 +233,7 @@ class TransactionBase(BaseModel):
             if self.transfer_account_id == self.account_id:
                 raise ValueError("I conti del trasferimento devono essere diversi")
             self.category_id = None
+            self.payee_id = None
         else:
             self.transfer_account_id = None
         return self
@@ -216,6 +256,8 @@ class TransactionOut(BaseModel):
     account: AccountRef
     category_id: int | None
     category: CategoryRef | None
+    payee_id: int | None
+    payee: PayeeRef | None
     transfer_account_id: int | None
     transfer_account: AccountRef | None
     recurring_id: int | None
@@ -283,6 +325,7 @@ class RecurringBase(BaseModel):
     description: str = Field(min_length=1, max_length=200)
     account_id: int
     category_id: int | None = None
+    payee_id: int | None = None
     transfer_account_id: int | None = None
     notes: str | None = None
     frequency: Frequency = "monthly"
@@ -305,6 +348,7 @@ class RecurringBase(BaseModel):
             if self.transfer_account_id == self.account_id:
                 raise ValueError("I conti del trasferimento devono essere diversi")
             self.category_id = None
+            self.payee_id = None
         else:
             self.transfer_account_id = None
         if self.end_date and self.end_date < self.start_date:
@@ -322,6 +366,7 @@ class RecurringUpdate(BaseModel):
     description: str | None = Field(default=None, min_length=1, max_length=200)
     account_id: int | None = None
     category_id: int | None = None
+    payee_id: int | None = None
     transfer_account_id: int | None = None
     notes: str | None = None
     frequency: Frequency | None = None
@@ -349,6 +394,8 @@ class RecurringOut(BaseModel):
     account: AccountRef
     category_id: int | None
     category: CategoryRef | None
+    payee_id: int | None
+    payee: PayeeRef | None
     transfer_account_id: int | None
     transfer_account: AccountRef | None
     monthly_equivalent: float
@@ -505,6 +552,163 @@ class CategoryReport(BaseModel):
     items: list[CategorySlice]
     average_transaction: float
     transaction_count: int
+
+
+# ------------------------------------------------------------------- statistics
+class LargestExpense(BaseModel):
+    amount: float
+    description: str
+    date: date
+    category_name: str | None = None
+
+
+class SummaryValues(BaseModel):
+    income: float = 0
+    expense: float = 0
+    net: float = 0
+    savings_rate: float = 0
+    transaction_count: int = 0
+    expense_count: int = 0
+    avg_expense: float = 0
+    daily_average: float = 0
+    active_days: int = 0
+    recurring_expense: float = 0
+    recurring_share: float = 0
+    largest_expense: LargestExpense | None = None
+
+
+class SummaryComparison(BaseModel):
+    current: SummaryValues
+    previous: SummaryValues
+    previous_year: SummaryValues
+    income_change: float | None = None
+    expense_change: float | None = None
+    net_change: float | None = None
+    savings_rate_change: float | None = None
+
+
+class SummaryOut(BaseModel):
+    date_from: date
+    date_to: date
+    comparison: SummaryComparison
+    series: list[MonthPoint]
+
+
+class DailySpendPoint(BaseModel):
+    date: date
+    amount: float
+    count: int
+
+
+class WeekdaySpendPoint(BaseModel):
+    weekday: int
+    label: str
+    amount: float
+    count: int
+
+
+class CalendarOut(BaseModel):
+    date_from: date
+    date_to: date
+    daily: list[DailySpendPoint]
+    weekday: list[WeekdaySpendPoint]
+    total: float
+    active_days: int
+
+
+class PayeeStat(BaseModel):
+    payee_id: int | None
+    name: str
+    default_category: CategoryRef | None = None
+    amount: float
+    count: int
+    average: float
+    percentage: float
+    last_used: date | None = None
+
+
+class PayeeReportOut(BaseModel):
+    date_from: date
+    date_to: date
+    type: str
+    total: float
+    items: list[PayeeStat]
+    top5_share: float
+    unassigned_amount: float
+
+
+class PayeeMonthlyPoint(BaseModel):
+    month: str
+    label: str
+    amount: float
+    count: int
+
+
+class PayeeDetailOut(BaseModel):
+    date_from: date
+    date_to: date
+    payee: PayeeRef
+    total: float
+    count: int
+    average: float
+    monthly: list[PayeeMonthlyPoint]
+    categories: list[CategorySlice]
+    last_used: date | None = None
+
+
+class AccountFlow(BaseModel):
+    id: int
+    name: str
+    type: str
+    color: str
+    balance: float
+    income: float
+    expense: float
+    transfer_in: float
+    transfer_out: float
+    net: float
+
+
+class TransferCell(BaseModel):
+    from_account_id: int
+    from_account_name: str
+    to_account_id: int
+    to_account_name: str
+    amount: float
+    count: int
+
+
+class AccountsReportOut(BaseModel):
+    date_from: date
+    date_to: date
+    total_balance: float
+    accounts: list[AccountFlow]
+    transfers: list[TransferCell]
+
+
+class BudgetHistoryPoint(BaseModel):
+    month: str
+    label: str
+    total_budget: float
+    total_spent: float
+    remaining: float
+    over_count: int
+    adherence: float
+
+
+class BudgetHistoryOut(BaseModel):
+    months: list[BudgetHistoryPoint]
+
+
+class SuggestionItem(BaseModel):
+    value: str
+    category_name: str | None = None
+    count: int = 0
+    last_used: date | None = None
+
+
+class SuggestionsOut(BaseModel):
+    items: list[SuggestionItem]
 
 
 class DashboardOut(BaseModel):

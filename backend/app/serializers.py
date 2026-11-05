@@ -7,6 +7,7 @@ from .schemas import (
     CategoryRef,
     ContributionOut,
     GoalOut,
+    PayeeRef,
     RecurringOut,
     TransactionOut,
 )
@@ -79,6 +80,8 @@ def recurring_out(rec: RecurringTransaction) -> RecurringOut:
         account=rec.account,
         category_id=rec.category_id,
         category=rec.category,
+        payee_id=rec.payee_id,
+        payee=PayeeRef.model_validate(rec.payee) if rec.payee else None,
         transfer_account_id=rec.transfer_account_id,
         transfer_account=rec.transfer_account,
         monthly_equivalent=from_cents(
@@ -100,6 +103,8 @@ def transaction_out(tx: Transaction) -> TransactionOut:
         account=AccountRef.model_validate(tx.account),
         category_id=tx.category_id,
         category=CategoryRef.model_validate(tx.category) if tx.category else None,
+        payee_id=tx.payee_id,
+        payee=PayeeRef.model_validate(tx.payee) if tx.payee else None,
         transfer_account_id=tx.transfer_account_id,
         transfer_account=AccountRef.model_validate(tx.transfer_account) if tx.transfer_account else None,
         recurring_id=tx.recurring_id,

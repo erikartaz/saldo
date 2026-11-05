@@ -9,15 +9,29 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from ..analytics import (
+    accounts_report,
+    budget_history,
+    calendar_report,
+    payee_detail,
+    payee_report,
+    summary_report,
+)
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import Account, Budget, Category, Goal, GoalContribution, RecurringTransaction, Transaction, User
+from ..models import Account, Budget, Category, Goal, GoalContribution, Payee, RecurringTransaction, Transaction, User
 from ..schemas import (
+    AccountsReportOut,
+    BudgetHistoryOut,
+    CalendarOut,
     CashflowOut,
     CategoryReport,
     DashboardOut,
     ForecastMonth,
     MonthPoint,
+    PayeeDetailOut,
+    PayeeReportOut,
+    SummaryOut,
     TrendOut,
 )
 from ..serializers import account_out, goal_out, transaction_out
@@ -80,6 +94,7 @@ def dashboard(
         .options(
             joinedload(Transaction.account),
             joinedload(Transaction.category),
+            joinedload(Transaction.payee),
             joinedload(Transaction.transfer_account),
         )
         .where(Transaction.user_id == user.id)
@@ -182,6 +197,83 @@ def cashflow(
     )
 
 
+def _resolve_range(date_from: date | None, date_to: date | None) -> tuple[date, date]:
+    today = date.today()
+    start = date_from or today.replace(day=1)
+    end = date_to or today
+    if start > end:
+        raise HTTPException(status_code=400, detail="La data iniziale deve precedere quella finale")
+    return start, end
+
+
+@router.get("/summary", response_model=SummaryOut)
+def summary(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SummaryOut:
+    start, end = _resolve_range(date_from, date_to)
+    return summary_report(db, user.id, start, end)
+
+
+@router.get("/calendar", response_model=CalendarOut)
+def calendar(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CalendarOut:
+    start, end = _resolve_range(date_from, date_to)
+    return calendar_report(db, user.id, start, end)
+
+
+@router.get("/payees", response_model=PayeeReportOut)
+def payees_report(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    tx_type: str = Query(default="expense", alias="type", pattern="^(income|expense)$"),
+    limit: int = Query(default=10, ge=1, le=50),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PayeeReportOut:
+    start, end = _resolve_range(date_from, date_to)
+    return payee_report(db, user.id, start, end, tx_type=tx_type, limit=limit)
+
+
+@router.get("/payees/{payee_id}", response_model=PayeeDetailOut)
+def payee_statistics(
+    payee_id: int,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    tx_type: str = Query(default="expense", alias="type", pattern="^(income|expense)$"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PayeeDetailOut:
+    start, end = _resolve_range(date_from, date_to)
+    return payee_detail(db, user.id, payee_id, start, end, tx_type=tx_type)
+
+
+@router.get("/accounts", response_model=AccountsReportOut)
+def accounts_statistics(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AccountsReportOut:
+    start, end = _resolve_range(date_from, date_to)
+    return accounts_report(db, user.id, start, end)
+
+
+@router.get("/budget-history", response_model=BudgetHistoryOut)
+def budgets_history(
+    months: int = Query(default=6, ge=1, le=24),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BudgetHistoryOut:
+    return budget_history(db, user.id, months)
+
+
 def _tx_type_label(value: str) -> str:
     return {"income": "Entrata", "expense": "Spesa", "transfer": "Trasferimento"}.get(value, value)
 
@@ -198,6 +290,7 @@ def export_csv(
         .options(
             joinedload(Transaction.account),
             joinedload(Transaction.category),
+            joinedload(Transaction.payee),
             joinedload(Transaction.transfer_account),
         )
         .where(Transaction.user_id == user.id)
@@ -211,7 +304,17 @@ def export_csv(
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";")
     writer.writerow(
-        ["Data", "Tipo", "Importo (EUR)", "Descrizione", "Conto", "Categoria", "Conto destinazione", "Note"]
+        [
+            "Data",
+            "Tipo",
+            "Importo (EUR)",
+            "Descrizione",
+            "Conto",
+            "Categoria",
+            "Beneficiario",
+            "Conto destinazione",
+            "Note",
+        ]
     )
     for tx in transactions:
         writer.writerow(
@@ -222,6 +325,7 @@ def export_csv(
                 tx.description,
                 tx.account.name if tx.account else "",
                 tx.category.name if tx.category else "",
+                tx.payee.name if tx.payee else "",
                 tx.transfer_account.name if tx.transfer_account else "",
                 tx.notes or "",
             ]
@@ -251,6 +355,7 @@ def export_json(
 
     accounts = db.scalars(select(Account).where(Account.user_id == user.id)).all()
     categories = db.scalars(select(Category).where(Category.user_id == user.id)).all()
+    payees = db.scalars(select(Payee).where(Payee.user_id == user.id)).all()
     transactions = db.scalars(
         select(Transaction).where(Transaction.user_id == user.id).order_by(Transaction.date)
     ).all()
@@ -290,6 +395,16 @@ def export_json(
             }
             for c in categories
         ],
+        "payees": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "default_category_id": p.default_category_id,
+                "notes": p.notes,
+                "archived": p.archived,
+            }
+            for p in payees
+        ],
         "transactions": [
             {
                 "id": t.id,
@@ -300,6 +415,7 @@ def export_json(
                 "notes": t.notes,
                 "account_id": t.account_id,
                 "category_id": t.category_id,
+                "payee_id": t.payee_id,
                 "transfer_account_id": t.transfer_account_id,
                 "recurring_id": t.recurring_id,
             }
@@ -315,6 +431,7 @@ def export_json(
                 "type": r.type,
                 "amount": from_cents(r.amount_cents),
                 "description": r.description,
+                "payee_id": r.payee_id,
                 "frequency": r.frequency,
                 "interval": r.interval,
                 "start_date": r.start_date.isoformat(),

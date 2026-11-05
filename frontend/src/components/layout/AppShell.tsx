@@ -17,6 +17,7 @@ import {
   Settings,
   Sun,
   Tags,
+  Users,
   Wallet,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
@@ -49,12 +50,13 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: '/recurring', label: 'Ricorrenti', icon: Repeat2 },
       { to: '/goals', label: 'Obiettivi', icon: Flag },
       { to: '/categories', label: 'Categorie', icon: Tags },
+      { to: '/payees', label: 'Beneficiari', icon: Users },
     ],
   },
   {
     label: 'Analisi',
     items: [
-      { to: '/reports', label: 'Report', icon: BarChart3 },
+      { to: '/reports', label: 'Statistiche', icon: BarChart3 },
       { to: '/settings', label: 'Impostazioni', icon: Settings },
     ],
   },
@@ -64,7 +66,7 @@ const MOBILE_ITEMS: NavItem[] = [
   { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/transactions', label: 'Movimenti', icon: ArrowLeftRight },
   { to: '/budgets', label: 'Budget', icon: PieChart },
-  { to: '/reports', label: 'Report', icon: BarChart3 },
+  { to: '/reports', label: 'Stats', icon: BarChart3 },
 ]
 
 function Brand({ onNavigate }: { onNavigate?: () => void }) {

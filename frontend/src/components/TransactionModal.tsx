@@ -4,18 +4,31 @@ import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Wallet } from 'lucide-reac
 import { api } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { ACCOUNT_TYPES, cn, parseAmount, todayISO } from '../lib/utils'
-import type { Account, Category, Transaction, TransactionInput, TransactionType } from '../types'
+import type {
+  Account,
+  Category,
+  Payee,
+  SuggestionItem,
+  Transaction,
+  TransactionInput,
+  TransactionType,
+} from '../types'
 import { useToast } from '../context/ToastContext'
 import { Modal } from './ui/Modal'
 import { Button } from './ui/Button'
 import { Field, FormError, Input, Select, Textarea } from './ui/Field'
 import { SegmentedControl } from './ui/Primitives'
+import { Combobox } from './ui/Combobox'
+import { PayeeField } from './PayeeField'
 
 interface TransactionModalProps {
   open: boolean
   onClose: () => void
   transaction?: Transaction | null
   defaultType?: TransactionType
+  defaultAccountId?: number | null
+  defaultTransferAccountId?: number | null
+  defaultDescription?: string
 }
 
 const TYPE_OPTIONS = [
@@ -24,7 +37,15 @@ const TYPE_OPTIONS = [
   { value: 'transfer' as const, label: 'Trasferimento', icon: ArrowLeftRight },
 ]
 
-export function TransactionModal({ open, onClose, transaction, defaultType = 'expense' }: TransactionModalProps) {
+export function TransactionModal({
+  open,
+  onClose,
+  transaction,
+  defaultType = 'expense',
+  defaultAccountId = null,
+  defaultTransferAccountId = null,
+  defaultDescription = '',
+}: TransactionModalProps) {
   const queryClient = useQueryClient()
   const toast = useToast()
 
@@ -34,6 +55,7 @@ export function TransactionModal({ open, onClose, transaction, defaultType = 'ex
   const [date, setDate] = useState(todayISO())
   const [accountId, setAccountId] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [payeeId, setPayeeId] = useState<number | null>(null)
   const [transferAccountId, setTransferAccountId] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -48,9 +70,20 @@ export function TransactionModal({ open, onClose, transaction, defaultType = 'ex
     queryFn: () => api.get<Category[]>('/categories'),
     enabled: open,
   })
+  const suggestionsQuery = useQuery({
+    queryKey: ['description-suggestions', type],
+    queryFn: () =>
+      api.get<{ items: SuggestionItem[] }>('/suggestions/descriptions', { type, limit: 20 }),
+    enabled: open,
+  })
 
   const accounts = accountsQuery.data ?? []
   const categories = categoriesQuery.data ?? []
+  const suggestionOptions = (suggestionsQuery.data?.items ?? []).map((item) => ({
+    value: item.value,
+    label: item.value,
+    hint: item.category_name ?? undefined,
+  }))
   const activeAccounts = accounts.filter((account) => !account.archived || account.id === transaction?.account_id)
 
   useEffect(() => {
@@ -63,6 +96,7 @@ export function TransactionModal({ open, onClose, transaction, defaultType = 'ex
       setDate(transaction.date)
       setAccountId(String(transaction.account_id))
       setCategoryId(transaction.category_id ? String(transaction.category_id) : '')
+      setPayeeId(transaction.payee_id)
       setTransferAccountId(
         transaction.transfer_account_id ? String(transaction.transfer_account_id) : '',
       )
@@ -70,14 +104,15 @@ export function TransactionModal({ open, onClose, transaction, defaultType = 'ex
     } else {
       setType(defaultType)
       setAmount('')
-      setDescription('')
+      setDescription(defaultDescription)
       setDate(todayISO())
-      setAccountId('')
+      setAccountId(defaultAccountId ? String(defaultAccountId) : '')
       setCategoryId('')
-      setTransferAccountId('')
+      setPayeeId(null)
+      setTransferAccountId(defaultTransferAccountId ? String(defaultTransferAccountId) : '')
       setNotes('')
     }
-  }, [open, transaction, defaultType])
+  }, [open, transaction, defaultType, defaultAccountId, defaultTransferAccountId, defaultDescription])
 
   useEffect(() => {
     if (!open || accountId) return
@@ -93,6 +128,46 @@ export function TransactionModal({ open, onClose, transaction, defaultType = 'ex
 
   const selectedAccount = accounts.find((account) => String(account.id) === accountId)
   const destinationOptions = activeAccounts.filter((account) => String(account.id) !== accountId)
+  const cashAccount = activeAccounts.find((account) => account.type === 'cash')
+  const bankAccount = activeAccounts.find((account) => account.type === 'checking')
+
+  const applyCashTemplate = (kind: 'withdraw' | 'deposit') => {
+    if (!cashAccount) {
+      toast.info('Crea prima un conto di tipo Contanti per usare questo modello')
+      return
+    }
+    const bank = bankAccount ?? activeAccounts.find((account) => account.type !== 'cash')
+    if (!bank) return
+    setType('transfer')
+    if (kind === 'withdraw') {
+      setAccountId(String(bank.id))
+      setTransferAccountId(String(cashAccount.id))
+      setDescription('Prelievo contanti')
+    } else {
+      setAccountId(String(cashAccount.id))
+      setTransferAccountId(String(bank.id))
+      setDescription('Versamento contanti')
+    }
+  }
+
+  const handleTypeChange = (nextType: TransactionType) => {
+    setType(nextType)
+    setError(null)
+    if (nextType === 'transfer') {
+      setCategoryId('')
+      setPayeeId(null)
+    } else {
+      setTransferAccountId('')
+      const current = categories.find((category) => String(category.id) === categoryId)
+      if (current && current.type !== nextType) setCategoryId('')
+    }
+  }
+
+  const handlePayeeSelected = (payee: Payee | null) => {
+    if (!payee?.default_category) return
+    if (payee.default_category.type !== type) return
+    if (!categoryId) setCategoryId(String(payee.default_category.id))
+  }
 
   const mutation = useMutation({
     mutationFn: (payload: TransactionInput) =>
@@ -106,18 +181,6 @@ export function TransactionModal({ open, onClose, transaction, defaultType = 'ex
     },
     onError: (mutationError: Error) => setError(mutationError.message),
   })
-
-  const handleTypeChange = (nextType: TransactionType) => {
-    setType(nextType)
-    setError(null)
-    if (nextType === 'transfer') {
-      setCategoryId('')
-    } else {
-      setTransferAccountId('')
-      const current = categories.find((category) => String(category.id) === categoryId)
-      if (current && current.type !== nextType) setCategoryId('')
-    }
-  }
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -152,6 +215,7 @@ export function TransactionModal({ open, onClose, transaction, defaultType = 'ex
       description: description.trim(),
       account_id: Number(accountId),
       category_id: type === 'transfer' || !categoryId ? null : Number(categoryId),
+      payee_id: type === 'transfer' || payeeId === null ? null : payeeId,
       transfer_account_id: type === 'transfer' ? Number(transferAccountId) : null,
       notes: notes.trim() ? notes.trim() : null,
     })
@@ -209,6 +273,29 @@ export function TransactionModal({ open, onClose, transaction, defaultType = 'ex
             fullWidth
           />
 
+          {type === 'transfer' ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                icon={<ArrowLeftRight className="h-3.5 w-3.5" />}
+                onClick={() => applyCashTemplate('withdraw')}
+              >
+                Prelievo contanti
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                icon={<ArrowLeftRight className="h-3.5 w-3.5" />}
+                onClick={() => applyCashTemplate('deposit')}
+              >
+                Versamento contanti
+              </Button>
+            </div>
+          ) : null}
+
           <div className="rounded-2xl border border-line bg-surface-2 px-4 py-4">
             <p className="text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">Importo</p>
             <div className="mt-1 flex items-baseline justify-center gap-1">
@@ -226,14 +313,34 @@ export function TransactionModal({ open, onClose, transaction, defaultType = 'ex
           </div>
 
           <Field label="Descrizione" htmlFor="tx-description">
-            <Input
+            <Combobox
               id="tx-description"
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={setDescription}
+              onSelect={(option) => setDescription(option.label)}
+              options={suggestionOptions}
               placeholder={type === 'transfer' ? 'Es. Giroconto risparmi' : 'Es. Spesa supermercato'}
-              maxLength={200}
+              loading={suggestionsQuery.isLoading}
+              emptyText="Scrivi una nuova descrizione"
             />
           </Field>
+
+          {type !== 'transfer' ? (
+            <Field
+              label={type === 'income' ? 'Pagatore' : 'Beneficiario'}
+              htmlFor="tx-payee"
+              hint="Facoltativo. Scrivi un nome e scegli «Crea beneficiario» per aggiungerlo."
+            >
+              <PayeeField
+                key={`${type}-${transaction?.id ?? 'new'}`}
+                id="tx-payee"
+                value={payeeId}
+                onChange={setPayeeId}
+                onPayeeSelected={handlePayeeSelected}
+                type={type}
+              />
+            </Field>
+          ) : null}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Data" htmlFor="tx-date">

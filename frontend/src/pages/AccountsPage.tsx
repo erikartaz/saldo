@@ -19,6 +19,7 @@ import { AppIcon } from '../lib/icons'
 import { Button, IconButton } from '../components/ui/Button'
 import { Field, FormError, Input, Select, Textarea } from '../components/ui/Field'
 import { ConfirmDialog, Modal } from '../components/ui/Modal'
+import { TransactionModal } from '../components/TransactionModal'
 import {
   Badge,
   ColorIconPicker,
@@ -232,6 +233,11 @@ export function AccountsPage() {
   const [editing, setEditing] = useState<Account | null>(null)
   const [deleting, setDeleting] = useState<Account | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [transfer, setTransfer] = useState<{
+    accountId: number
+    transferAccountId: number | null
+    description: string
+  } | null>(null)
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['accounts'],
@@ -274,6 +280,24 @@ export function AccountsPage() {
     setModalOpen(true)
   }
 
+  const openTransfer = (account: Account) => {
+    setTransfer({ accountId: account.id, transferAccountId: null, description: '' })
+  }
+
+  const openCashTemplate = () => {
+    const cash = activeAccounts.find((account) => account.type === 'cash')
+    const bank = activeAccounts.find((account) => account.type === 'checking')
+    if (!cash || !bank) {
+      toast.info('Servono un conto corrente e un conto contanti per usare il prelievo rapido')
+      return
+    }
+    setTransfer({
+      accountId: bank.id,
+      transferAccountId: cash.id,
+      description: 'Prelievo contanti',
+    })
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -281,9 +305,18 @@ export function AccountsPage() {
         title="I tuoi conti"
         subtitle="Tieni insieme banca, risparmi, contanti e carte in un unico patrimonio."
         actions={
-          <Button icon={<Plus className="h-4 w-4" />} onClick={openCreate}>
-            Nuovo conto
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              icon={<ArrowLeftRight className="h-4 w-4" />}
+              onClick={openCashTemplate}
+            >
+              Prelievo contanti
+            </Button>
+            <Button icon={<Plus className="h-4 w-4" />} onClick={openCreate}>
+              Nuovo conto
+            </Button>
+          </>
         }
       />
 
@@ -384,6 +417,11 @@ export function AccountsPage() {
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                    {!account.archived ? (
+                      <IconButton label="Trasferisci da questo conto" onClick={() => openTransfer(account)}>
+                        <ArrowLeftRight className="h-4 w-4" />
+                      </IconButton>
+                    ) : null}
                     <IconButton label="Modifica conto" onClick={() => openEdit(account)}>
                       <Pencil className="h-4 w-4" />
                     </IconButton>
@@ -446,6 +484,16 @@ export function AccountsPage() {
         onClose={() => setModalOpen(false)}
         account={editing}
         defaultColor={PALETTE[accounts.length % PALETTE.length]}
+      />
+
+      <TransactionModal
+        open={transfer !== null}
+        onClose={() => setTransfer(null)}
+        transaction={null}
+        defaultType="transfer"
+        defaultAccountId={transfer?.accountId ?? null}
+        defaultTransferAccountId={transfer?.transferAccountId ?? null}
+        defaultDescription={transfer?.description ?? ''}
       />
 
       <ConfirmDialog

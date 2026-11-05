@@ -12,6 +12,7 @@ from .models import (
     Budget,
     Category,
     Goal,
+    Payee,
     RecurringTransaction,
     Transaction,
 )
@@ -413,6 +414,7 @@ def _occurrence_recurring_query():
         .options(
             joinedload(RecurringTransaction.account),
             joinedload(RecurringTransaction.category),
+            joinedload(RecurringTransaction.payee),
             joinedload(RecurringTransaction.transfer_account),
         )
         .where(RecurringTransaction.active.is_(True))
@@ -508,6 +510,7 @@ def post_due_recurring(
                 user_id=user_id,
                 account_id=rec.account_id,
                 category_id=rec.category_id,
+                payee_id=rec.payee_id,
                 transfer_account_id=rec.transfer_account_id,
                 recurring_id=rec.id,
                 type=rec.type,
@@ -558,12 +561,22 @@ def owned_category(db: Session, user_id: int, category_id: int) -> Category:
     return category
 
 
+def owned_payee(db: Session, user_id: int, payee_id: int) -> Payee:
+    payee = db.get(Payee, payee_id)
+    if payee is None or payee.user_id != user_id:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Beneficiario non trovato")
+    return payee
+
+
 def validate_transaction_links(
     db: Session,
     user_id: int,
     *,
     account_id: int,
     category_id: int | None,
+    payee_id: int | None,
     transfer_account_id: int | None,
     tx_type: str,
 ) -> None:
@@ -575,6 +588,8 @@ def validate_transaction_links(
     if tx_type == "transfer":
         if not transfer_account_id:
             raise HTTPException(status_code=400, detail="Seleziona il conto di destinazione")
+        if payee_id is not None:
+            raise HTTPException(status_code=400, detail="Un trasferimento non ha un beneficiario")
         destination = owned_account(db, user_id, transfer_account_id)
         if destination.archived:
             raise HTTPException(status_code=400, detail="Il conto di destinazione è archiviato")
@@ -587,6 +602,8 @@ def validate_transaction_links(
                 status_code=400,
                 detail="La categoria non è compatibile con il tipo di movimento",
             )
+    if payee_id is not None:
+        owned_payee(db, user_id, payee_id)
 
 
 def transaction_with_relations(db: Session, tx_id: int) -> Transaction | None:
@@ -595,6 +612,7 @@ def transaction_with_relations(db: Session, tx_id: int) -> Transaction | None:
         .options(
             joinedload(Transaction.account),
             joinedload(Transaction.category),
+            joinedload(Transaction.payee).joinedload(Payee.default_category),
             joinedload(Transaction.transfer_account),
         )
         .where(Transaction.id == tx_id)

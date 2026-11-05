@@ -100,11 +100,12 @@ def serve_spa(full_path: str):
     if full_path:
         candidate = (FRONTEND_DIST / full_path).resolve()
         if FRONTEND_DIST.resolve() in candidate.parents and candidate.is_file():
-            return FileResponse(candidate)
+            headers = {"Cache-Control": "no-store"} if candidate.suffix == ".html" else None
+            return FileResponse(candidate, headers=headers)
 
     index = FRONTEND_DIST / "index.html"
     if index.is_file():
-        return FileResponse(index)
+        return FileResponse(index, headers={"Cache-Control": "no-store"})
 
     return JSONResponse(
         status_code=404,

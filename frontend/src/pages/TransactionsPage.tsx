@@ -9,6 +9,7 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  StickyNote,
   Trash2,
   Wallet,
 } from 'lucide-react'
@@ -472,7 +473,14 @@ export function TransactionsPage() {
                           <div className="min-w-0">
                             <p className="truncate text-[13px] font-medium text-ink">{transaction.description}</p>
                             {transaction.notes ? (
-                              <p className="truncate text-[11px] text-muted">{transaction.notes}</p>
+                              <p
+                                className="mt-0.5 flex min-w-0 items-center gap-1 text-[10.5px] text-muted/85"
+                                title={transaction.notes}
+                              >
+                                <StickyNote className="h-3 w-3 shrink-0" />
+                                <span className="shrink-0 font-medium">Nota:</span>
+                                <span className="truncate">{transaction.notes}</span>
+                              </p>
                             ) : null}
                           </div>
                         </div>
@@ -560,6 +568,13 @@ export function TransactionsPage() {
                             {transaction.payee ? ` · ${transaction.payee.name}` : ''}{' '}
                             · {transaction.type === 'transfer' ? `${transaction.account.name} → ${transaction.transfer_account?.name}` : transaction.account.name}
                           </p>
+                          {transaction.notes ? (
+                            <p className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-muted/80" title={transaction.notes}>
+                              <StickyNote className="h-3 w-3 shrink-0" />
+                              <span className="shrink-0 font-medium">Nota:</span>
+                              <span className="truncate">{transaction.notes}</span>
+                            </p>
+                          ) : null}
                         </div>
                         <span className="shrink-0 text-[13px]">
                           <Amount transaction={transaction} />
